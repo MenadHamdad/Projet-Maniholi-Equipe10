@@ -12,7 +12,7 @@ public class PlayerV1 extends Joueur {
 
     public PlayerV1(String sonNom) {
         super(sonNom);
-        PlateauAnalyser plateauAnalyser = new PlateauAnalyser();
+        this.plateauAnalyser = new PlateauAnalyser();
     }
 
     @Override
