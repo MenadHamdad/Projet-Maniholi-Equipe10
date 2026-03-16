@@ -13,6 +13,7 @@ import jeu.Joueur;
 import jeu.MaitreDuJeu;
 import jeu.Plateau;
 import jeu.aetoile.Noeud;
+import main.PlayerV3;
 
 import static config.ConfigurationLog.UNITES_DE_RESSOURCAGE;
 import static util.Outils.pointToString;
@@ -43,7 +44,7 @@ public class Launcheur {
      *  Vous pouvez positionner sa valeur Ã  false, si vous
      *  ne voulez plus voir s'afficher le logo au lancement.
      */
-    public static final boolean LOGO_ACTIF = true;
+    public static final boolean LOGO_ACTIF = false;
 
     /**
      * Rayon autour de la case cliquÃ©e pour rechercher et afficher dans la console
@@ -133,7 +134,9 @@ public class Launcheur {
          * de Joueur, c'est-Ã -dire des joueurs Ã  dÃ©placement alÃ©atoire. *
          * **************************************************************/
         jeu.metJoueurEnPosition(0, new PlayerV1("1")); // un joueur spÃ©cifique
-        jeu.metJoueurEnPosition(1, new PlayerV2("2")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(2, new PlayerV2("2")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(1, new PlayerV3("2")); // un joueur spÃ©cifique
+
         //jeu.metJoueurEnPosition(1, new JoueurHumain("Panisse",fenetre)); // un joueur humain
         //jeu.metJoueurEnPosition(2, new Joueur("Escartefigue")); // un joueur Ã  dÃ©placement alÃ©atoire
         //jeu.metJoueurEnPosition(3, new Joueur("M. Brun")); // un joueur Ã  dÃ©placement alÃ©atoire
