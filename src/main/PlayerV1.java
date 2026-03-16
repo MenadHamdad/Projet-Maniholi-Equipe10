@@ -114,7 +114,7 @@ public class PlayerV1 extends Joueur {
         // Priorité 3 : capturer le meilleur moulin
         Point cible = trouveMeilleurMoulin(plateau, pos, energie, toursRestants, false);
         if (cible != null) {
-            Action a = allerVers(plateau, pos, cible);
+            Action a = allerVersUnePosition(plateau, pos, cible);
             if (a != null) return a;
         }
 
@@ -130,10 +130,6 @@ public class PlayerV1 extends Joueur {
     //  MODE FIN DE PARTIE AGRESSIF
     // =========================================================================
 
-    /**
-     * Sous SEUIL_FIN_PARTIE tours : marge supprimée, mais ENERGIE_MIN_CAPTURE
-     * toujours garantie pour ne jamais tomber à 0 (= 0 bouteille ce tour).
-     */
     private Action faitUneActionFinDePartie(Plateau plateau, Point pos, int energie,
                                             int toursRestants, int nbMoulins) {
         if (energie < ENERGIE_MIN_CAPTURE) {
@@ -142,27 +138,13 @@ public class PlayerV1 extends Joueur {
 
         Point cible = trouveMeilleurMoulin(plateau, pos, energie, toursRestants, true);
         if (cible != null) {
-            Action a = allerVers(plateau, pos, cible);
-            if (a != null) return a;
+            Action a = allerVersUnePosition(plateau, pos, cible);
+            return a;
         }
 
         return Action.RIEN;
     }
 
-    // =========================================================================
-    //  SCORING : MEILLEUR MOULIN (lookahead 3 niveaux)
-    // =========================================================================
-
-    /**
-     * Sélectionne le moulin (libre ou ennemi) avec le meilleur score :
-     * <p>
-     * score = [ (toursRestants - dist) + cluster×2.5 + lookahead3 ]
-     * × bonusEnnemi × malusContestation
-     * / (dist + 1)
-     * <p>
-     * Contrainte énergie : energie >= dist + ENERGIE_MIN_CAPTURE [+ MARGE_SECURITE]
-     * Garantit : energie - dist - 20 >= 1 après capture.
-     */
     private Point trouveMeilleurMoulin(Plateau plateau, Point pos, int energie,
                                        int toursRestants, boolean modeAgressif) {
         final int margeMin = modeAgressif
@@ -205,10 +187,6 @@ public class PlayerV1 extends Joueur {
         return meilleur;
     }
 
-    /**
-     * Lookahead récursif sur PROFONDEUR_LOOKAHEAD niveaux.
-     * Chaque niveau est déprécié par DEPRECIATION_LOOKAHEAD (incertitude croissante).
-     */
     private double scoreLookahead(Plateau plateau, Point depart, int energieApres,
                                   int toursApres, int profondeur, double poids,
                                   boolean modeAgressif) {
@@ -266,19 +244,10 @@ public class PlayerV1 extends Joueur {
             demarrerRecolte(energie, nbMoulins, toursRestants);
             return Action.RIEN;
         }
-        Action a = allerVers(plateau, pos, oliveraiePosition);
+        Action a = allerVersUnePosition(plateau, pos, oliveraiePosition);
         return (a != null) ? a : Action.RIEN;
     }
 
-    /**
-     * Sélectionne la meilleure oliveraie selon le ratio gain_espéré / distance_réelle.
-     * <p>
-     * Trois améliorations combinées :
-     * #2 : Exclut les oliveraies occupées par un adversaire.
-     * #7 : Score = gainTotal_espéré / distance_A* (et non la plus proche en Manhattan).
-     * Une oliveraie éloignée mais très rechargée peut battre une proche mais peu utile.
-     * Le gain espéré est simulé depuis l'énergie actuelle pour être précis.
-     */
     private Point trouveOliveraieOptimale(Plateau plateau, Point pos, int energieActuelle) {
         if (analyser.oliveraies.isEmpty()) return null;
 
@@ -313,11 +282,6 @@ public class PlayerV1 extends Joueur {
         return meilleure;
     }
 
-    /**
-     * Simule le gain total d'énergie obtenu en entrant dans une oliveraie
-     * avec l'énergie actuelle, en suivant la séquence 10/20/60/20/10.
-     * S'arrête à 100 d'énergie (plafond).
-     */
     private int simulerGainOliveraie(int energieActuelle) {
         int energieSim = energieActuelle;
         int gainTotal = 0;
@@ -342,17 +306,6 @@ public class PlayerV1 extends Joueur {
         toursOptimaux = 0;
     }
 
-    /**
-     * Durée optimale en oliveraie selon la séquence 10/20/60/20/10.
-     * <p>
-     * #12 : valeurEnergie intègre le nombre de moulins possédés.
-     * Raisonnement : avec N moulins, chaque point d'énergie récupéré permet
-     * de produire N bouteilles par tour supplémentaire.
-     * → valeurEnergie = toursRestants × max(1, nbMoulins) / 100
-     * <p>
-     * Avec 0 moulin : max(1, 0) = 1 → comportement identique à avant.
-     * Avec 3 moulins : l'énergie vaut 3× plus → on repart plus tôt.
-     */
     private int calculerToursOptimaux(int energieActuelle, int nbMoulins, int toursRestants) {
         // #12 : pondération par le stock de moulins
         double valeurEnergie = (toursRestants * Math.max(1, nbMoulins)) / 100.0;
@@ -382,24 +335,7 @@ public class PlayerV1 extends Joueur {
                 plateau.donneContenuCelluleSansJoueur(pos.x, pos.y));
     }
 
-    // =========================================================================
-    //  NAVIGATION
-    // =========================================================================
-
-    /**
-     * Premier pas A* vers la cible avec évitement des adversaires.
-     * <p>
-     * #9 — Détection de couloir :
-     * Si la case actuelle a ≤ SEUIL_COULOIR cases libres adjacentes,
-     * on est dans un passage étroit. Le blocage des adjacences adverses
-     * provoquerait une oscillation → on passe directement au chemin brut.
-     * <p>
-     * #8 — 3 niveaux d'évitement progressif :
-     * Niveau 1 : positions adversaires + leurs 4 cases adjacentes bloquées
-     * Niveau 2 : uniquement les positions des adversaires bloquées
-     * Niveau 3 : chemin brut sans aucun évitement (dernier recours)
-     */
-    private Action allerVers(Plateau plateau, Point depart, Point cible) {
+    private Action allerVersUnePosition(Plateau plateau, Point depart, Point cible) {
         if (depart == null || cible == null) return null;
         if (depart.equals(cible)) return Action.RIEN;
 
@@ -429,11 +365,6 @@ public class PlayerV1 extends Joueur {
         return directionVers(depart, chemin.get(0).getX(), chemin.get(0).getY());
     }
 
-    /**
-     * #9 : Détecte un couloir en comptant les cases libres adjacentes.
-     * Un couloir = ≤ SEUIL_COULOIR cases traversables autour de nous.
-     * Dans ce cas, éviter les adjacences adverses bloquerait notre unique sortie.
-     */
     private boolean estDansCouloir(Plateau plateau, Point pos) {
         int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
         int libres = 0;
@@ -446,10 +377,6 @@ public class PlayerV1 extends Joueur {
         return libres <= SEUIL_COULOIR;
     }
 
-    /**
-     * #8 — Niveau 1 : positions des adversaires + leurs 4 cases adjacentes.
-     * Garantit qu'on ne longe jamais un adversaire (déclencheur de manille).
-     */
     private List<Noeud> construireObstaclesComplets(Plateau plateau) {
         List<Noeud> obstacles = new ArrayList<>();
         int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
@@ -464,10 +391,6 @@ public class PlayerV1 extends Joueur {
         return obstacles;
     }
 
-    /**
-     * #8 — Niveau 2 : uniquement les positions directes des adversaires.
-     * Fallback si le niveau 1 bloque tous les chemins possibles.
-     */
     private List<Noeud> construireObstaclesPositions() {
         List<Noeud> obstacles = new ArrayList<>();
         for (Point p : analyser.positionsAdversaires) {
@@ -476,15 +399,6 @@ public class PlayerV1 extends Joueur {
         return obstacles;
     }
 
-    // =========================================================================
-    //  UTILITAIRES
-    // =========================================================================
-
-    /**
-     * Distance A* réelle entre deux points.
-     * AEtoile.donneChemin() exclut le nœud de départ → chemin.size() = nb de pas.
-     * Retourne 0 si depart == arrivee, -1 si inaccessible.
-     */
     private int distance(Plateau plateau, Point depart, Point arrivee) {
         if (plateau == null || depart == null || arrivee == null) return -1;
         if (depart.equals(arrivee)) return 0;
