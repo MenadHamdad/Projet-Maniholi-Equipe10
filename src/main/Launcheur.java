@@ -133,7 +133,6 @@ public class Launcheur {
          * de Joueur, c'est-Ã -dire des joueurs Ã  dÃ©placement alÃ©atoire. *
          * **************************************************************/
         jeu.metJoueurEnPosition(0, new PlayerV1("1")); // un joueur spÃ©cifique
-        jeu.metJoueurEnPosition(1, new PlayerV2("2")); // un joueur spÃ©cifique
         //jeu.metJoueurEnPosition(1, new JoueurHumain("Panisse",fenetre)); // un joueur humain
         //jeu.metJoueurEnPosition(2, new Joueur("Escartefigue")); // un joueur Ã  dÃ©placement alÃ©atoire
         //jeu.metJoueurEnPosition(3, new Joueur("M. Brun")); // un joueur Ã  dÃ©placement alÃ©atoire

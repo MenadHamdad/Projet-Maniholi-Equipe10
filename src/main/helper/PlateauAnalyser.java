@@ -3,32 +3,69 @@ package helper;
 import jeu.Joueur;
 import jeu.Plateau;
 
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+
+
 public class PlateauAnalyser {
 
-    int nombreRessources = 0;
-    int nombreProductionsLibres = 0;
-    int nombreProductionsAdverses = 0;
-    int nombreObstacles = 0;
+    public int nombreRessources          = 0;
+    public int nombreMoulinsLibres       = 0;
+    public int nombreMoulinsAdverses     = 0;
+    public int nombreMoulinsNous         = 0;
+    public int nombreObstacles           = 0;
+    public int totalMoulins              = 0;
 
+    /** Toutes les oliveraies de la carte. */
+    public final List<Point> oliveraies         = new ArrayList<>();
+    /** Moulins libres (non capturés). */
+    public final List<Point> moulinsLibres       = new ArrayList<>();
+    /** Moulins appartenant à un adversaire. */
+    public final List<Point> moulinsAdverses     = new ArrayList<>();
+    /** Moulins nous appartenant. */
+    public final List<Point> moulinsNous         = new ArrayList<>();
+    /** Positions actuelles des adversaires. */
+    public final List<Point> positionsAdversaires = new ArrayList<>();
 
-    public void analysePlateau (Plateau etatDuJeu , Joueur joueur) {
+    // ── Adversaire le plus riche en moulins ───────────────────────────────────
 
-        int taille = etatDuJeu.donneTaille();
+    public Joueur adversaireLePlusRiche  = null;
+    public int    moulinsAdversaireLePlusRiche = 0;
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public void analysePlateau(Plateau plateau, Joueur joueur) {
+        reinitialiser();
+
+        int taille = plateau.donneTaille();
 
         for (int y = 0; y < taille; y++) {
             for (int x = 0; x < taille; x++) {
-                int contenu = etatDuJeu.donneContenuCellule(x, y);
+                // donneContenuCelluleSansJoueur : vrai type de case sans masque joueur
+                int contenu = plateau.donneContenuCelluleSansJoueur(x, y);
+                Point p = new Point(x, y);
 
                 if (Plateau.contientUneUniteDeRessourcage(contenu)) {
                     nombreRessources++;
+                    oliveraies.add(p);
                 }
 
-                if (Plateau.contientUneUniteDeProductionLibre(contenu)) {
-                    nombreProductionsLibres++;
-                }
+                if (Plateau.contientUneUniteDeProduction(contenu)) {
+                    totalMoulins++;
 
-                if (Plateau.contientUneUniteDeProductionQuiNeLuiAppartientPas(joueur, contenu)) {
-                    nombreProductionsAdverses++;
+                    if (Plateau.contientUneUniteDeProductionLibre(contenu)) {
+                        nombreMoulinsLibres++;
+                        moulinsLibres.add(p);
+
+                    } else if (Plateau.contientUneUniteDeProductionQuiNeLuiAppartientPas(joueur, contenu)) {
+                        nombreMoulinsAdverses++;
+                        moulinsAdverses.add(p);
+
+                    } else {
+                        nombreMoulinsNous++;
+                        moulinsNous.add(p);
+                    }
                 }
 
                 if (Plateau.contientUneZoneInfranchissable(contenu)) {
@@ -37,5 +74,35 @@ public class PlateauAnalyser {
             }
         }
 
+        // Positions et stats des adversaires
+        for (Joueur j : plateau.donneJoueurs()) {
+            if (j == joueur) {
+                continue;
+            }
+            positionsAdversaires.add(j.donnePosition());
+
+            int moulinsJ = plateau.nombreDUnitesDeProductionJoueur(j.donneRang());
+            if (moulinsJ > moulinsAdversaireLePlusRiche) {
+                moulinsAdversaireLePlusRiche = moulinsJ;
+                adversaireLePlusRiche        = j;
+            }
+        }
+    }
+
+    private void reinitialiser() {
+        nombreRessources               = 0;
+        nombreMoulinsLibres            = 0;
+        nombreMoulinsAdverses          = 0;
+        nombreMoulinsNous              = 0;
+        nombreObstacles                = 0;
+        totalMoulins                   = 0;
+        moulinsAdversaireLePlusRiche   = 0;
+        adversaireLePlusRiche          = null;
+
+        oliveraies.clear();
+        moulinsLibres.clear();
+        moulinsAdverses.clear();
+        moulinsNous.clear();
+        positionsAdversaires.clear();
     }
 }
