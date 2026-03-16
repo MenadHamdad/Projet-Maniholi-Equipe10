@@ -1,9 +1,6 @@
-package main;
-
 import helper.PlateauAnalyser;
 import jeu.Joueur;
 import jeu.Plateau;
-import jeu.*;
 import jeu.aetoile.Noeud;
 
 import java.awt.Point;

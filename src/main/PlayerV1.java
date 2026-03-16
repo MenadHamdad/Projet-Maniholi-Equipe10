@@ -9,52 +9,40 @@ import java.util.List;
 
 public class PlayerV1 extends Joueur {
 
-    // ── Coûts du jeu (règles exactes) ─────────────────────────────────────────
-    private static final int    COUT_CAPTURE        = 20;
-    /**
-     * Énergie minimale avant capture : energie - 20 >= 1 obligatoire
-     * pour continuer à produire des bouteilles après la capture.
-     */
-    private static final int    ENERGIE_MIN_CAPTURE = COUT_CAPTURE + 1; // 21
+    private static final int COUT_CAPTURE = 20;
 
-    // ── Seuils d'énergie (mode normal) ────────────────────────────────────────
-    private static final int    SEUIL_CRITIQUE      = 40;
-    private static final int    SEUIL_PREVENTIF     = 70;
-    private static final int    MARGE_SECURITE      = 10;
+    private static final int ENERGIE_MIN_CAPTURE = COUT_CAPTURE + 1; // 21
+
+    private static final int SEUIL_CRITIQUE = 20;
+    private static final int SEUIL_PREVENTIF = 70;
+    private static final int MARGE_SECURITE = 10;
 
     // ── Fin de partie ─────────────────────────────────────────────────────────
-    /** Sous ce seuil, MARGE_SECURITE est supprimée (mode agressif). */
-    private static final int    SEUIL_FIN_PARTIE    = 50;
+    /**
+     * Sous ce seuil, MARGE_SECURITE est supprimée (mode agressif).
+     */
+    private static final int SEUIL_FIN_PARTIE = 50;
 
     // ── Scoring moulins ───────────────────────────────────────────────────────
-    private static final int    RAYON_CLUSTER       = 5;
-    private static final double POIDS_CLUSTER       = 2.5;
-    private static final double BONUS_ENNEMI        = 1.4;
-    private static final double MALUS_CONTESTE      = 0.6;
-    private static final int    RAYON_DANGER        = 3;
+    private static final int RAYON_CLUSTER = 5;
+    private static final double POIDS_CLUSTER = 2.5;
+    private static final double BONUS_ENNEMI = 1.4;
+    private static final double MALUS_CONTESTE = 0.6;
+    private static final int RAYON_DANGER = 3;
 
     // ── Lookahead 3 niveaux ───────────────────────────────────────────────────
-    private static final int    PROFONDEUR_LOOKAHEAD   = 3;
+    private static final int PROFONDEUR_LOOKAHEAD = 3;
     private static final double DEPRECIATION_LOOKAHEAD = 0.5;
 
-    // ── Oliveraie ─────────────────────────────────────────────────────────────
-    /**
-     * Séquence de gain d'énergie par tour en oliveraie.
-     * Tour 1→+10, tour 2→+20, tour 3→+60, tour 4→+20, tour 5→+10.
-     */
-    private static final int[]  GAIN_OLIVERAIE      = {10, 20, 60, 20, 10};
+    // todo revoir comment on utilise ca dans le code
+    private static final int[] GAIN_OLIVERAIE = {10, 20, 60, 20, 10};
 
-    /**
-     * Seuil de cases libres adjacentes en dessous duquel on considère
-     * être dans un couloir (#9). Dans un couloir, le sur-évitement des
-     * adjacences adverses provoquerait une oscillation → on saute au chemin brut.
-     */
-    private static final int    SEUIL_COULOIR       = 2;
+    private static final int SEUIL_COULOIR = 2;
 
     // ── État interne (réinitialisé via debutDePartie) ─────────────────────────
     private boolean enTrainDeRecolter = false;
-    private int     toursEnOliveraie  = 0;
-    private int     toursOptimaux     = 0;
+    private int toursEnOliveraie = 0;
+    private int toursOptimaux = 0;
 
     private final PlateauAnalyser analyser;
 
@@ -65,16 +53,12 @@ public class PlayerV1 extends Joueur {
         this.analyser = new PlateauAnalyser();
     }
 
-    /**
-     * Réinitialise l'état interne entre les parties du tournoi.
-     * Le MaitreDuJeu réutilise la même instance sans recréer le joueur.
-     */
     @Override
     public void debutDePartie(int rang) {
         super.debutDePartie(rang);
         enTrainDeRecolter = false;
-        toursEnOliveraie  = 0;
-        toursOptimaux     = 0;
+        toursEnOliveraie = 0;
+        toursOptimaux = 0;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -83,24 +67,24 @@ public class PlayerV1 extends Joueur {
     public Action faitUneAction(Plateau plateau) {
         analyser.analysePlateau(plateau, this);
 
-        final Point   pos          = donnePosition();
-        final int     energie      = donneRessources();
-        final int     tourCourant  = plateau.donneTourCourant();
-        final int     toursRestants = plateau.donneNombreDeTours() - tourCourant;
-        final int     nbMoulins    = analyser.nombreMoulinsNous;
-        final boolean finPartie    = toursRestants <= SEUIL_FIN_PARTIE;
+        Point pos = donnePosition();
+        int energie = donneRessources();
+        int tourCourant = plateau.donneTourCourant();
+        int toursRestants = plateau.donneNombreDeTours() - tourCourant;
+        int nbMoulins = analyser.nombreMoulinsNous;
+        boolean finPartie = toursRestants <= SEUIL_FIN_PARTIE;
 
         // ── Récolte en oliveraie en cours ─────────────────────────────────────
         if (enTrainDeRecolter) {
             if (estSurOliveraie(plateau, pos)) {
                 toursEnOliveraie++;
                 if (energie >= 100 || toursEnOliveraie >= toursOptimaux) {
-                    terminerRecolte(); // on continue ce tour vers un moulin
+                    terminerRecolte();
                 } else {
                     return Action.RIEN;
                 }
             } else {
-                terminerRecolte(); // sécurité : on n'est plus sur l'oliveraie
+                terminerRecolte();
             }
         }
 
@@ -171,11 +155,11 @@ public class PlayerV1 extends Joueur {
 
     /**
      * Sélectionne le moulin (libre ou ennemi) avec le meilleur score :
-     *
-     *   score = [ (toursRestants - dist) + cluster×2.5 + lookahead3 ]
-     *           × bonusEnnemi × malusContestation
-     *           / (dist + 1)
-     *
+     * <p>
+     * score = [ (toursRestants - dist) + cluster×2.5 + lookahead3 ]
+     * × bonusEnnemi × malusContestation
+     * / (dist + 1)
+     * <p>
      * Contrainte énergie : energie >= dist + ENERGIE_MIN_CAPTURE [+ MARGE_SECURITE]
      * Garantit : energie - dist - 20 >= 1 après capture.
      */
@@ -185,8 +169,8 @@ public class PlayerV1 extends Joueur {
                 ? ENERGIE_MIN_CAPTURE
                 : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
 
-        Point  meilleur = null;
-        double mScore   = Double.NEGATIVE_INFINITY;
+        Point meilleur = null;
+        double mScore = Double.NEGATIVE_INFINITY;
 
         List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
         candidats.addAll(analyser.moulinsAdverses);
@@ -209,12 +193,12 @@ public class PlayerV1 extends Joueur {
                     toursRestants - dist, PROFONDEUR_LOOKAHEAD,
                     DEPRECIATION_LOOKAHEAD, modeAgressif);
 
-            if (ennemi)                      score *= BONUS_ENNEMI;
+            if (ennemi) score *= BONUS_ENNEMI;
             if (adversaireProcheDeCase(cible)) score *= MALUS_CONTESTE;
             score /= (dist + 1.0);
 
             if (score > mScore) {
-                mScore   = score;
+                mScore = score;
                 meilleur = cible;
             }
         }
@@ -234,9 +218,9 @@ public class PlayerV1 extends Joueur {
                 ? ENERGIE_MIN_CAPTURE
                 : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
 
-        Point  bestCible = null;
-        int    bestDist  = 0;
-        double best      = 0;
+        Point bestCible = null;
+        int bestDist = 0;
+        double best = 0;
 
         List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
         candidats.addAll(analyser.moulinsAdverses);
@@ -254,16 +238,16 @@ public class PlayerV1 extends Joueur {
             if (ennemi) s *= BONUS_ENNEMI;
 
             if (s > best) {
-                best      = s;
+                best = s;
                 bestCible = cible;
-                bestDist  = dist;
+                bestDist = dist;
             }
         }
 
         if (bestCible == null) return 0;
 
-        double scoreNiveau     = best * poids;
-        int    energieSuivante = energieApres - bestDist - COUT_CAPTURE;
+        double scoreNiveau = best * poids;
+        int energieSuivante = energieApres - bestDist - COUT_CAPTURE;
         scoreNiveau += scoreLookahead(plateau, bestCible, energieSuivante,
                 toursApres - bestDist, profondeur - 1,
                 poids * DEPRECIATION_LOOKAHEAD, modeAgressif);
@@ -276,25 +260,24 @@ public class PlayerV1 extends Joueur {
 
     private Action allerVersOliveraieOuRester(Plateau plateau, Point pos, int energie,
                                               int nbMoulins, int toursRestants) {
-        Point oliveraie = trouveOliveraieOptimale(plateau, pos, energie);
-        if (oliveraie == null) return Action.RIEN;
+        Point oliveraiePosition = trouveOliveraieOptimale(plateau, pos, energie);
 
-        if (pos.equals(oliveraie)) {
+        if (pos.equals(oliveraiePosition)) {
             demarrerRecolte(energie, nbMoulins, toursRestants);
             return Action.RIEN;
         }
-        Action a = allerVers(plateau, pos, oliveraie);
+        Action a = allerVers(plateau, pos, oliveraiePosition);
         return (a != null) ? a : Action.RIEN;
     }
 
     /**
      * Sélectionne la meilleure oliveraie selon le ratio gain_espéré / distance_réelle.
-     *
+     * <p>
      * Trois améliorations combinées :
-     *   #2 : Exclut les oliveraies occupées par un adversaire.
-     *   #7 : Score = gainTotal_espéré / distance_A* (et non la plus proche en Manhattan).
-     *        Une oliveraie éloignée mais très rechargée peut battre une proche mais peu utile.
-     *        Le gain espéré est simulé depuis l'énergie actuelle pour être précis.
+     * #2 : Exclut les oliveraies occupées par un adversaire.
+     * #7 : Score = gainTotal_espéré / distance_A* (et non la plus proche en Manhattan).
+     * Une oliveraie éloignée mais très rechargée peut battre une proche mais peu utile.
+     * Le gain espéré est simulé depuis l'énergie actuelle pour être précis.
      */
     private Point trouveOliveraieOptimale(Plateau plateau, Point pos, int energieActuelle) {
         if (analyser.oliveraies.isEmpty()) return null;
@@ -304,7 +287,7 @@ public class PlayerV1 extends Joueur {
             if (pos.equals(o)) return o;
         }
 
-        Point  meilleure     = null;
+        Point meilleure = null;
         double meilleurRatio = -1.0;
 
         for (Point o : analyser.oliveraies) {
@@ -324,7 +307,7 @@ public class PlayerV1 extends Joueur {
 
             if (ratio > meilleurRatio) {
                 meilleurRatio = ratio;
-                meilleure     = o;
+                meilleure = o;
             }
         }
         return meilleure;
@@ -337,50 +320,50 @@ public class PlayerV1 extends Joueur {
      */
     private int simulerGainOliveraie(int energieActuelle) {
         int energieSim = energieActuelle;
-        int gainTotal  = 0;
+        int gainTotal = 0;
         for (int gain : GAIN_OLIVERAIE) {
             if (energieSim >= 100) break;
             int gainReel = Math.min(gain, 100 - energieSim);
-            gainTotal   += gainReel;
-            energieSim  += gainReel;
+            gainTotal += gainReel;
+            energieSim += gainReel;
         }
         return gainTotal;
     }
 
     private void demarrerRecolte(int energie, int nbMoulins, int toursRestants) {
-        toursOptimaux     = calculerToursOptimaux(energie, nbMoulins, toursRestants);
+        toursOptimaux = calculerToursOptimaux(energie, nbMoulins, toursRestants);
         enTrainDeRecolter = true;
-        toursEnOliveraie  = 1;
+        toursEnOliveraie = 1;
     }
 
     private void terminerRecolte() {
         enTrainDeRecolter = false;
-        toursEnOliveraie  = 0;
-        toursOptimaux     = 0;
+        toursEnOliveraie = 0;
+        toursOptimaux = 0;
     }
 
     /**
      * Durée optimale en oliveraie selon la séquence 10/20/60/20/10.
-     *
+     * <p>
      * #12 : valeurEnergie intègre le nombre de moulins possédés.
      * Raisonnement : avec N moulins, chaque point d'énergie récupéré permet
      * de produire N bouteilles par tour supplémentaire.
      * → valeurEnergie = toursRestants × max(1, nbMoulins) / 100
-     *
+     * <p>
      * Avec 0 moulin : max(1, 0) = 1 → comportement identique à avant.
      * Avec 3 moulins : l'énergie vaut 3× plus → on repart plus tôt.
      */
     private int calculerToursOptimaux(int energieActuelle, int nbMoulins, int toursRestants) {
         // #12 : pondération par le stock de moulins
         double valeurEnergie = (toursRestants * Math.max(1, nbMoulins)) / 100.0;
-        int    energieSim    = energieActuelle;
-        int    toursRester   = 0;
+        int energieSim = energieActuelle;
+        int toursRester = 0;
 
         for (int gain : GAIN_OLIVERAIE) {
             if (energieSim >= 100) break;
-            int    gainReel = Math.min(gain, 100 - energieSim);
+            int gainReel = Math.min(gain, 100 - energieSim);
             double benefice = gainReel * valeurEnergie;
-            double cout     = nbMoulins;
+            double cout = nbMoulins;
 
             // On reste si le bénéfice dépasse le coût, ou si énergie très basse
             if (benefice >= cout || energieSim < 30) {
@@ -405,20 +388,20 @@ public class PlayerV1 extends Joueur {
 
     /**
      * Premier pas A* vers la cible avec évitement des adversaires.
-     *
+     * <p>
      * #9 — Détection de couloir :
-     *   Si la case actuelle a ≤ SEUIL_COULOIR cases libres adjacentes,
-     *   on est dans un passage étroit. Le blocage des adjacences adverses
-     *   provoquerait une oscillation → on passe directement au chemin brut.
-     *
+     * Si la case actuelle a ≤ SEUIL_COULOIR cases libres adjacentes,
+     * on est dans un passage étroit. Le blocage des adjacences adverses
+     * provoquerait une oscillation → on passe directement au chemin brut.
+     * <p>
      * #8 — 3 niveaux d'évitement progressif :
-     *   Niveau 1 : positions adversaires + leurs 4 cases adjacentes bloquées
-     *   Niveau 2 : uniquement les positions des adversaires bloquées
-     *   Niveau 3 : chemin brut sans aucun évitement (dernier recours)
+     * Niveau 1 : positions adversaires + leurs 4 cases adjacentes bloquées
+     * Niveau 2 : uniquement les positions des adversaires bloquées
+     * Niveau 3 : chemin brut sans aucun évitement (dernier recours)
      */
     private Action allerVers(Plateau plateau, Point depart, Point cible) {
         if (depart == null || cible == null) return null;
-        if (depart.equals(cible))            return Action.RIEN;
+        if (depart.equals(cible)) return Action.RIEN;
 
         ArrayList<Noeud> chemin;
 
@@ -452,8 +435,8 @@ public class PlayerV1 extends Joueur {
      * Dans ce cas, éviter les adjacences adverses bloquerait notre unique sortie.
      */
     private boolean estDansCouloir(Plateau plateau, Point pos) {
-        int[][] dirs  = {{0,1},{0,-1},{1,0},{-1,0}};
-        int     libres = 0;
+        int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+        int libres = 0;
         for (int[] d : dirs) {
             int nx = pos.x + d[0], ny = pos.y + d[1];
             if (!plateau.coordonneeValide(nx, ny)) continue;
@@ -469,7 +452,7 @@ public class PlayerV1 extends Joueur {
      */
     private List<Noeud> construireObstaclesComplets(Plateau plateau) {
         List<Noeud> obstacles = new ArrayList<>();
-        int[][] dirs = {{0,1},{0,-1},{1,0},{-1,0}};
+        int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
         for (Point p : analyser.positionsAdversaires) {
             obstacles.add(new Noeud(p.x, p.y));
             for (int[] d : dirs) {
