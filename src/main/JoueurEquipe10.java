@@ -163,6 +163,67 @@ public class JoueurEquipe10 extends Joueur {
         return Action.RIEN;
     }
 
+    private int calculerToursOptimaux(int energieActuelle, int nbMoulins, int toursRestants) {
+        double valeurEnergie = (toursRestants * (double) Math.max(1, nbMoulins)) / 100.0;
+        int energieSim = energieActuelle;
+        int toursRester = 0;
+
+        for (int gain : GAIN_OLIVERAIE) {
+            if (energieSim >= 100) break;
+            int gainReel = Math.min(gain, 100 - energieSim);
+            double benefice = gainReel * valeurEnergie;
+            double cout = Math.max(1, nbMoulins);
+            if (benefice >= cout || energieSim < 30) {
+                toursRester++;
+                energieSim += gainReel;
+            } else {
+                break;
+            }
+        }
+        return Math.max(1, toursRester);
+    }
+
+    /**
+     * Termine la récolte et signale via vientDeTerminerRecolte=true que ce tour
+     * on vient de quitter l'oliveraie
+     */
+    private void terminerRecolte() {
+        enTrainDeRecolter = false;
+        toursEnOliveraie = 0;
+        toursOptimaux = 0;
+        vientDeTerminerRecolte = true;
+    }
+
+    private void demarrerRecolte(int energie, int nbMoulins, int toursRestants) {
+        toursOptimaux = calculerToursOptimaux(energie, nbMoulins, toursRestants);
+        enTrainDeRecolter = true;
+        toursEnOliveraie = 1;
+    }
+
+    private Action allerVersOliveraieOuRester(Plateau plateau, Point actualPosition, int energie,
+                                              int nbMoulins, int toursRestants) {
+        if (cibleOliveraie != null && analyser.positionsAdversaires.contains(cibleOliveraie)) {
+            cibleOliveraie = null;
+        }
+
+        if (cibleOliveraie == null) {
+            cibleOliveraie = trouveOliveraieOptimale(plateau, actualPosition, energie);
+        }
+        if (cibleOliveraie == null) {
+            return Action.RIEN;
+        }
+
+        // Si on ce trouve deja sur l'oliveraie optimale
+        if (actualPosition.equals(cibleOliveraie)) {
+            cibleOliveraie = null;
+            demarrerRecolte(energie, nbMoulins, toursRestants);
+            return Action.RIEN;
+        }
+
+        Action action = allerVers(plateau, actualPosition, cibleOliveraie);
+        return (action != null) ? action : Action.RIEN;
+    }
+
     private int distanceMinOliveraie(Point actualPoint) {
         int distanceMin = 0;
         for (Point point : analyser.oliveraies) {
@@ -215,108 +276,22 @@ public class JoueurEquipe10 extends Joueur {
         return meilleur;
     }
 
-    private Action faitUneActionFinDePartie(Plateau plateau, Point pos, int energie,
-                                            int toursRestants, int nbMoulins) {
-        if (energie < ENERGIE_MIN_CAPTURE) {
-            return allerVersOliveraieOuRester(plateau, pos, energie, nbMoulins, toursRestants);
-        }
-        Point cible = trouveMeilleurMoulin(plateau, pos, energie, toursRestants, true);
-        if (cible != null) {
-            Action a = allerVers(plateau, pos, cible);
-            if (a != null) return a;
-        }
-        return Action.RIEN;
-    }
+    private int distanceCachee(Plateau plateau, Point depart, Point arrivee) {
+        if (depart == null || arrivee == null) return -1;
+        if (depart.equals(arrivee)) return 0;
 
-    // =========================================================================
-    //  SCORING : MEILLEUR MOULIN (lookahead 3 niveaux)
-    // =========================================================================
+        long cle = ((long) depart.x << 15)
+                | ((long) depart.y << 10)
+                | ((long) arrivee.x << 5)
+                | (long) arrivee.y;
 
-    private Point trouveMeilleurMoulin(Plateau plateau, Point pos, int energie,
-                                       int toursRestants, boolean modeAgressif) {
-        final int margeMin = modeAgressif
-                ? ENERGIE_MIN_CAPTURE
-                : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
+        Integer cached = cacheDistances.get(cle);
+        if (cached != null) return cached;
 
-        Point meilleur = null;
-        double mScore = Double.NEGATIVE_INFINITY;
-
-        List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
-        candidats.addAll(analyser.moulinsAdverses);
-
-        for (Point cible : candidats) {
-            int dist = distanceCachee(plateau, pos, cible);
-            if (dist <= 0) continue;
-            if (energie < dist + margeMin) continue;
-            if (!peutCapturerEtRentrer(energie, dist, cible)) continue;
-
-            int toursGain = toursRestants - dist;
-            if (toursGain <= 0) continue;
-
-            boolean ennemi = analyser.moulinsAdverses.contains(cible);
-
-            double score = toursGain;
-            score += compteMoulinsProches(cible) * POIDS_CLUSTER;
-            score += scoreLookahead(plateau, cible,
-                    energie - dist - COUT_CAPTURE,
-                    toursRestants - dist,
-                    PROFONDEUR_LOOKAHEAD, DEPRECIATION_LOOKAHEAD, modeAgressif);
-
-            if (ennemi) score *= BONUS_ENNEMI;
-            if (adversaireProcheDeCase(cible)) score *= MALUS_CONTESTE;
-            score /= (dist + 1.0);
-
-            if (score > mScore) {
-                mScore = score;
-                meilleur = cible;
-            }
-        }
-        return meilleur;
-    }
-
-    private double scoreLookahead(Plateau plateau, Point depart, int energieApres,
-                                  int toursApres, int profondeur, double poids,
-                                  boolean modeAgressif) {
-        if (profondeur == 0 || energieApres < ENERGIE_MIN_CAPTURE || toursApres <= 0) return 0;
-
-        final int margeMin = modeAgressif
-                ? ENERGIE_MIN_CAPTURE
-                : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
-
-        Point bestCible = null;
-        int bestDist = 0;
-        double best = 0;
-
-        List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
-        candidats.addAll(analyser.moulinsAdverses);
-
-        for (Point cible : candidats) {
-            if (cible.equals(depart)) continue;
-            int dist = distanceCachee(plateau, depart, cible);
-            if (dist <= 0) continue;
-            if (energieApres < dist + margeMin) continue;
-            int tg = toursApres - dist;
-            if (tg <= 0) continue;
-
-            boolean ennemi = analyser.moulinsAdverses.contains(cible);
-            double s = (double) tg / (dist + 1.0);
-            if (ennemi) s *= BONUS_ENNEMI;
-
-            if (s > best) {
-                best = s;
-                bestCible = cible;
-                bestDist = dist;
-            }
-        }
-
-        if (bestCible == null) return 0;
-
-        double scoreNiveau = best * poids;
-        scoreNiveau += scoreLookahead(plateau, bestCible,
-                energieApres - bestDist - COUT_CAPTURE,
-                toursApres - bestDist,
-                profondeur - 1, poids * DEPRECIATION_LOOKAHEAD, modeAgressif);
-        return scoreNiveau;
+        ArrayList<Noeud> chemin = plateau.donneCheminEntre(depart, arrivee);
+        int dist = (chemin == null) ? -1 : chemin.size();
+        cacheDistances.put(cle, dist);
+        return dist;
     }
 
     private boolean peutCapturerEtRentrer(int energie, int distMoulin, Point moulin) {
@@ -333,46 +308,151 @@ public class JoueurEquipe10 extends Joueur {
         return energieApres > distOliv + BUFFER_RETOUR;
     }
 
-    // =========================================================================
-    //  OLIVERAIE
-    // =========================================================================
-
-    private Action allerVersOliveraieOuRester(Plateau plateau, Point pos, int energie,
-                                              int nbMoulins, int toursRestants) {
-        if (cibleOliveraie != null
-                && analyser.positionsAdversaires.contains(cibleOliveraie)) {
-            cibleOliveraie = null;
+    private Action faitUneActionFinDePartie(Plateau plateau, Point actualPoint, int energie,
+                                            int toursRestants, int nbMoulins) {
+        if (energie < ENERGIE_MIN_CAPTURE) {
+            return allerVersOliveraieOuRester(plateau, actualPoint, energie, nbMoulins, toursRestants);
         }
-        if (cibleOliveraie == null) {
-            cibleOliveraie = trouveOliveraieOptimale(plateau, pos, energie);
+        Point cible = trouveMeilleurMoulin(plateau, actualPoint, energie, toursRestants, true);
+        if (cible != null) {
+            Action a = allerVers(plateau, actualPoint, cible);
+            if (a != null) return a;
         }
-        if (cibleOliveraie == null) return Action.RIEN;
-
-        if (pos.equals(cibleOliveraie)) {
-            cibleOliveraie = null;
-            demarrerRecolte(energie, nbMoulins, toursRestants);
-            return Action.RIEN;
-        }
-
-        Action a = allerVers(plateau, pos, cibleOliveraie);
-        return (a != null) ? a : Action.RIEN;
+        return Action.RIEN;
     }
+
+    private Point trouveMeilleurMoulin(Plateau plateau, Point actualPoint, int energie, int toursRestants, boolean modeAgressif) {
+        final int margeMin = modeAgressif ? ENERGIE_MIN_CAPTURE : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
+
+        Point meilleurPoint = null;
+        double meilleurScore = Double.NEGATIVE_INFINITY;
+
+        List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
+        candidats.addAll(analyser.moulinsAdverses);
+
+        for (Point cible : candidats) {
+            int dist = distanceCachee(plateau, actualPoint, cible);
+
+            // On regarde si on a assez d'énergie pour y acceder
+            if (energie < dist + margeMin) {
+                continue;
+            }
+
+            if (!peutCapturerEtRentrer(energie, dist, cible)) {
+                continue;
+            }
+
+            // On regarde s'il nous reste assez de tours pour acceder au moulin
+            int toursGain = toursRestants - dist;
+            if (toursGain <= 0) {
+                continue;
+            }
+
+            boolean isMoulinEnnemi = analyser.moulinsAdverses.contains(cible);
+
+            double score = toursGain;
+            score += compteMoulinsProches(cible) * POIDS_CLUSTER;
+            score += scoreLookahead(plateau, cible,
+                    energie - dist - COUT_CAPTURE,
+                    toursRestants - dist,
+                    PROFONDEUR_LOOKAHEAD, DEPRECIATION_LOOKAHEAD, modeAgressif);
+
+            if (isMoulinEnnemi) {
+                score *= BONUS_ENNEMI;
+            }
+            if (adversaireProcheDeCase(cible)) {
+                score *= MALUS_CONTESTE;
+            }
+
+            score /= (dist + 1.0);
+
+            if (score > meilleurScore) {
+                meilleurScore = score;
+                meilleurPoint = cible;
+            }
+        }
+        return meilleurPoint;
+    }
+
+    private double scoreLookahead(Plateau plateau, Point depart, int energieApres,
+                                  int toursApres, int profondeur, double poids,
+                                  boolean modeAgressif) {
+
+        if (profondeur == 0 || energieApres < ENERGIE_MIN_CAPTURE || toursApres <= 0) {
+            return 0;
+        }
+
+        final int margeMin = modeAgressif
+                ? ENERGIE_MIN_CAPTURE
+                : ENERGIE_MIN_CAPTURE + MARGE_SECURITE;
+
+        Point bestCible = null;
+        int bestDist = 0;
+        double best = 0;
+
+        List<Point> candidats = new ArrayList<>(analyser.moulinsLibres);
+        candidats.addAll(analyser.moulinsAdverses);
+
+        for (Point cible : candidats) {
+
+            if (cible.equals(depart)) {
+                continue;
+            }
+            int dist = distanceCachee(plateau, depart, cible);
+
+            // On regarde si on a assez d'énergie pour y acceder
+            if (energieApres < dist + margeMin) {
+                continue;
+            }
+
+            // On regarde s'il nous reste assez de tours pour acceder au moulin
+            double toursGain = toursApres - dist;
+            if (toursGain <= 0) {
+                continue;
+            }
+
+            boolean isMoulinEnnemi = analyser.moulinsAdverses.contains(cible);
+            double score = toursGain / (dist + 1.0);
+
+            if (isMoulinEnnemi) {
+                score *= BONUS_ENNEMI;
+            }
+
+            if (score > best) {
+                best = score;
+                bestCible = cible;
+                bestDist = dist;
+            }
+        }
+
+        if (bestCible == null) {
+            return 0;
+        }
+
+        double scoreNiveau = best * poids;
+
+        scoreNiveau += scoreLookahead(plateau
+                , bestCible,
+                energieApres - bestDist - COUT_CAPTURE,
+                toursApres - bestDist,
+                profondeur - 1, poids * DEPRECIATION_LOOKAHEAD, modeAgressif);
+
+        return scoreNiveau;
+    }
+
 
     /**
      * Sélectionne la meilleure oliveraie libre selon gain/distance.
-     * <p>
-     * CORRECTION BUG : si vientDeTerminerRecolte=true, on exclut la case
-     * actuelle pour ne pas retourner immédiatement dans l'oliveraie qu'on
-     * vient de quitter. En dernier recours (aucune autre disponible), on
-     * l'autorise quand même pour ne pas rester bloqué.
      */
-    private Point trouveOliveraieOptimale(Plateau plateau, Point pos, int energieActuelle) {
+    private Point trouveOliveraieOptimale(Plateau plateau, Point actualPosition, int energieActuelle) {
         if (analyser.oliveraies.isEmpty()) return null;
 
-        // Si on est dessus ET qu'on n'est pas en train de terminer une récolte → rester
+        // Si on est dessus ET qu'on n'est pas en train de terminer une récolte on reste sans rien faire
         if (!vientDeTerminerRecolte) {
-            for (Point o : analyser.oliveraies) {
-                if (pos.equals(o)) return o;
+            for (Point point : analyser.oliveraies) {
+                if (actualPosition.equals(point)) {
+                    return point;
+                }
             }
         }
 
@@ -380,26 +460,32 @@ public class JoueurEquipe10 extends Joueur {
         Point meilleure = null;
         double bestRatio = -1.0;
 
-        for (Point o : analyser.oliveraies) {
-            if (analyser.positionsAdversaires.contains(o)) continue;
+        for (Point point : analyser.oliveraies) {
+
+            if (analyser.positionsAdversaires.contains(point)) {
+                continue;
+            }
+
             // Exclure l'oliveraie courante si on vient de terminer dedans
-            if (vientDeTerminerRecolte && pos.equals(o)) continue;
+            if (vientDeTerminerRecolte && actualPosition.equals(point)) {
+                continue;
+            }
 
-            int dist = distanceCachee(plateau, pos, o);
-            if (dist <= 0 || gain <= 0) continue;
+            double distanceCachee = distanceCachee(plateau, actualPosition, point);
+            if (distanceCachee <= 0 || gain <= 0) continue;
 
-            double ratio = (double) gain / dist;
+            double ratio = gain / distanceCachee;
             if (ratio > bestRatio) {
                 bestRatio = ratio;
-                meilleure = o;
+                meilleure = point;
             }
         }
 
-        // Dernier recours : si aucune autre oliveraie n'est disponible,
-        // autoriser celle où on se trouve (évite de rester sans cible)
+        // si aucune autre oliveraie n'est disponible,
+        // autoriser celle où on se trouve
         if (meilleure == null && vientDeTerminerRecolte) {
-            for (Point o : analyser.oliveraies) {
-                if (pos.equals(o)) return o;
+            for (Point point : analyser.oliveraies) {
+                if (actualPosition.equals(point)) return point;
             }
         }
 
@@ -407,59 +493,16 @@ public class JoueurEquipe10 extends Joueur {
     }
 
     private int simulerGainOliveraie(int energieActuelle) {
-        int sim = energieActuelle, total = 0;
-        for (int g : GAIN_OLIVERAIE) {
-            if (sim >= 100) break;
-            int r = Math.min(g, 100 - sim);
-            total += r;
-            sim += r;
-        }
-        return total;
-    }
-
-    private void demarrerRecolte(int energie, int nbMoulins, int toursRestants) {
-        toursOptimaux = calculerToursOptimaux(energie, nbMoulins, toursRestants);
-        enTrainDeRecolter = true;
-        toursEnOliveraie = 1;
-    }
-
-    /**
-     * Termine la récolte et signale via vientDeTerminerRecolte=true que ce tour
-     * on vient de quitter l'oliveraie → évite les deux bugs :
-     * 1. Redémarrage immédiat de la récolte (boucle Priorité 1)
-     * 2. Retour vers la même oliveraie dans trouveOliveraieOptimale
-     */
-    private void terminerRecolte() {
-        enTrainDeRecolter = false;
-        toursEnOliveraie = 0;
-        toursOptimaux = 0;
-        vientDeTerminerRecolte = true;
-    }
-
-    private int calculerToursOptimaux(int energieActuelle, int nbMoulins, int toursRestants) {
-        double valeurEnergie = (toursRestants * (double) Math.max(1, nbMoulins)) / 100.0;
-        int energieSim = energieActuelle;
-        int toursRester = 0;
-
+        int simulation = energieActuelle, total = 0;
         for (int gain : GAIN_OLIVERAIE) {
-            if (energieSim >= 100) break;
-            int gainReel = Math.min(gain, 100 - energieSim);
-            double benefice = gainReel * valeurEnergie;
-            double cout = Math.max(1, nbMoulins);
-            if (benefice >= cout || energieSim < 30) {
-                toursRester++;
-                energieSim += gainReel;
-            } else {
+            if (simulation >= 100){
                 break;
             }
+            int result = Math.min(gain, 100 - simulation);
+            total += result;
+            simulation += result;
         }
-        return Math.max(1, toursRester);
-    }
-
-    private boolean estSurOliveraie(Plateau plateau, Point pos) {
-        if (pos == null) return false;
-        return Plateau.contientUneUniteDeRessourcage(
-                plateau.donneContenuCelluleSansJoueur(pos.x, pos.y));
+        return total;
     }
 
     private Action allerVers(Plateau plateau, Point depart, Point cible) {
@@ -495,6 +538,12 @@ public class JoueurEquipe10 extends Joueur {
         return directionVers(depart, chemin.get(0).getX(), chemin.get(0).getY());
     }
 
+    private boolean estSurOliveraie(Plateau plateau, Point pos) {
+        if (pos == null) return false;
+        return Plateau.contientUneUniteDeRessourcage(
+                plateau.donneContenuCelluleSansJoueur(pos.x, pos.y));
+    }
+
     private boolean estDansCouloir(Plateau plateau, Point pos) {
         int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
         int libres = 0;
@@ -526,28 +575,6 @@ public class JoueurEquipe10 extends Joueur {
         for (Point p : analyser.positionsAdversaires)
             obs.add(new Noeud(p.x, p.y));
         return obs;
-    }
-
-    // =========================================================================
-    //  UTILITAIRES
-    // =========================================================================
-
-    private int distanceCachee(Plateau plateau, Point depart, Point arrivee) {
-        if (depart == null || arrivee == null) return -1;
-        if (depart.equals(arrivee)) return 0;
-
-        long cle = ((long) depart.x << 15)
-                | ((long) depart.y << 10)
-                | ((long) arrivee.x << 5)
-                | (long) arrivee.y;
-
-        Integer cached = cacheDistances.get(cle);
-        if (cached != null) return cached;
-
-        ArrayList<Noeud> chemin = plateau.donneCheminEntre(depart, arrivee);
-        int dist = (chemin == null) ? -1 : chemin.size();
-        cacheDistances.put(cle, dist);
-        return dist;
     }
 
     private int compteMoulinsProches(Point centre) {
