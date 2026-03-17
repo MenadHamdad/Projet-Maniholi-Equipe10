@@ -43,7 +43,7 @@ public class Launcheur {
      *  Vous pouvez positionner sa valeur Ã  false, si vous
      *  ne voulez plus voir s'afficher le logo au lancement.
      */
-    public static final boolean LOGO_ACTIF = true;
+    public static final boolean LOGO_ACTIF = false;
 
     /**
      * Rayon autour de la case cliquÃ©e pour rechercher et afficher dans la console
@@ -109,11 +109,11 @@ public class Launcheur {
          * --- GÃ©nÃ©ration du plateau ---                  *
          * Vous pouvez utiliser le plateau de votre choix *
          * ************************************************/
-        //final Plateau plateau = Plateau.generePlateauTournoi(); // un plateau alÃ©atoire de tournoi
+        final Plateau plateau = Plateau.generePlateauTournoi(); // un plateau alÃ©atoire de tournoi
         //final Plateau plateau = Plateau.generePlateauAleatoire(100, 10, 8, 8, 20); // un plateau alÃ©atoire 20x20 pour une partie de 100 tours, 32 moulins, 32 oliveraies et 80 rochers
         //final Plateau plateau = Plateau.generePlateauAleatoire(1200, 10, 8, 8, 20); // un plateau alÃ©atoire 20x20 pour une partie de 1200 tours, 32 moulins, 32 oliveraies et 80 rochers
         //final Plateau plateau = new Plateau(300, Plateau.TEXTE_PLATEAU_ANORMAL_8x8_1); // un plateau prÃ©dÃ©fini 8x8 de test
-        final Plateau plateau = new Plateau(1000, Plateau.TEXTE_PLATEAU_ENONCE); // le plateau 20x20 de l'Ã©noncÃ© pour une partie de 1000 tours
+        //final Plateau plateau = new Plateau(1000, ); // le plateau 20x20 de l'Ã©noncÃ© pour une partie de 1000 tours
 
         /* ***********************************
          * --- CrÃ©ation du maitre de jeu --- *

@@ -88,37 +88,29 @@ public class PlayerV1 extends Joueur {
             }
         }
 
-        // ── Priorité 0 : énergie nulle → oliveraie (impossible de capturer) ───
         if (energie == 0) {
             return allerVersOliveraieOuRester(plateau, pos, energie, nbMoulins, toursRestants);
         }
 
-        // ── Mode fin de partie ────────────────────────────────────────────────
         if (finPartie) {
             return faitUneActionFinDePartie(plateau, pos, energie, toursRestants, nbMoulins);
         }
 
-        // ─── MODE NORMAL ──────────────────────────────────────────────────────
-
-        // Priorité 1 : déjà sur oliveraie et énergie basse → rester
         if (estSurOliveraie(plateau, pos) && energie < SEUIL_PREVENTIF) {
             demarrerRecolte(energie, nbMoulins, toursRestants);
             return Action.RIEN;
         }
 
-        // Priorité 2 : énergie critique → recharger
         if (energie <= SEUIL_CRITIQUE) {
             return allerVersOliveraieOuRester(plateau, pos, energie, nbMoulins, toursRestants);
         }
 
-        // Priorité 3 : capturer le meilleur moulin
         Point cible = trouveMeilleurMoulin(plateau, pos, energie, toursRestants, false);
         if (cible != null) {
             Action a = allerVersUnePosition(plateau, pos, cible);
             if (a != null) return a;
         }
 
-        // Priorité 4 : recharge préventive
         if (energie < SEUIL_PREVENTIF) {
             return allerVersOliveraieOuRester(plateau, pos, energie, nbMoulins, toursRestants);
         }
