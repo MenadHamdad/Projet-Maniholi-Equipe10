@@ -85,7 +85,7 @@ public class JoueurEquipe10 extends Joueur {
 
         // On compare la position actuelle avec celle du tour précédent.
         if (!enTrainDeRecolter) {
-            if (positionPrecedente.equals(pos)) {
+            if (positionPrecedente != null && positionPrecedente.equals(pos)) {
                 toursImmobile++;
             } else {
                 toursImmobile = 0;
