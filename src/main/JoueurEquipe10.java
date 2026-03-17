@@ -94,6 +94,8 @@ public class JoueurEquipe10 extends Joueur {
         positionPrecedente = new Point(pos.x, pos.y);
 
         final int distMinOliveraie = distanceMinOliveraie(pos);
+
+        // On garde toujours assez d'énergie pour rejoindre une oliveraie
         final int seuilCritique = Math.max(SEUIL_CRITIQUE_BASE,
                 distMinOliveraie + BUFFER_OLIVERAIE);
 
@@ -163,6 +165,11 @@ public class JoueurEquipe10 extends Joueur {
         return Action.RIEN;
     }
 
+    // Détermine combien de tours il est rentable de rester dans une oliveraie.
+    // Le calcul compare :
+    // - la valeur stratégique de l'énergie (basée sur moulins + tours restants)
+    // - le coût d'un tour immobile (perte potentielle de capture de moulin).
+    // On arrête la récolte quand le gain devient moins intéressant.
     private int calculerToursOptimaux(int energieActuelle, int nbMoulins, int toursRestants) {
         double valeurEnergie = (toursRestants * (double) Math.max(1, nbMoulins)) / 100.0;
         int energieSim = energieActuelle;
@@ -294,6 +301,10 @@ public class JoueurEquipe10 extends Joueur {
         return dist;
     }
 
+    // Vérifie qu'après la capture d'un moulin le joueur aura encore
+    // assez d'énergie pour rejoindre une oliveraie.
+    // Cela évite de capturer un moulin puis de tomber à 0 énergie
+    // loin de toute source de recharge.
     private boolean peutCapturerEtRentrer(int energie, int distMoulin, Point moulin) {
         int energieApres = energie - distMoulin - COUT_CAPTURE;
         if (energieApres < 1) return false;
@@ -374,6 +385,11 @@ public class JoueurEquipe10 extends Joueur {
         return meilleurPoint;
     }
 
+    // Simulation récursive de captures futures.
+    // On estime la valeur d'un moulin en regardant les moulins
+    // potentiellement capturables ensuite.
+    // Chaque niveau de profondeur est déprécié pour éviter
+    // de surestimer les gains trop lointains.
     private double scoreLookahead(Plateau plateau, Point depart, int energieApres,
                                   int toursApres, int profondeur, double poids,
                                   boolean modeAgressif) {
@@ -505,15 +521,20 @@ public class JoueurEquipe10 extends Joueur {
         return total;
     }
 
+
     private Action allerVers(Plateau plateau, Point depart, Point cible) {
         if (depart == null || cible == null) return null;
         if (depart.equals(cible)) return Action.RIEN;
 
         ArrayList<Noeud> chemin;
 
-        boolean forcerBrut = estSurOliveraie(plateau, depart)   // manille impossible depuis oliveraie
-                || toursImmobile >= NOMBRE_TOUR_BLOCAGE       // déblocage forcé
-                || estDansCouloir(plateau, depart);     // éviter oscillation
+        // Stratégie de pathfinding en plusieurs niveaux :
+        // 1) éviter les adversaires + leurs cases adjacentes
+        // 2) éviter seulement les positions adverses
+        // 3) fallback : chemin brut si aucun chemin sûr trouvé
+        boolean forcerBrut = estSurOliveraie(plateau, depart)
+                || toursImmobile >= NOMBRE_TOUR_BLOCAGE
+                || estDansCouloir(plateau, depart);
 
         if (forcerBrut) {
             chemin = plateau.donneCheminEntre(depart, cible);
@@ -556,6 +577,9 @@ public class JoueurEquipe10 extends Joueur {
         return libres <= SEUIL_COULOIR;
     }
 
+    // On considère les adversaires comme des obstacles dynamiques,
+    // ainsi que les cases adjacentes pour éviter les collisions
+    // ou les confrontations directes.
     private List<Noeud> construireObstaclesComplets(Plateau plateau) {
         List<Noeud> obstacles = new ArrayList<>();
         int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
