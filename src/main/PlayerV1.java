@@ -17,10 +17,6 @@ public class PlayerV1 extends Joueur {
     private static final int SEUIL_PREVENTIF = 70;
     private static final int MARGE_SECURITE = 10;
 
-    // ── Fin de partie ─────────────────────────────────────────────────────────
-    /**
-     * Sous ce seuil, MARGE_SECURITE est supprimée (mode agressif).
-     */
     private static final int SEUIL_FIN_PARTIE = 50;
 
     // ── Scoring moulins ───────────────────────────────────────────────────────
@@ -34,19 +30,15 @@ public class PlayerV1 extends Joueur {
     private static final int PROFONDEUR_LOOKAHEAD = 3;
     private static final double DEPRECIATION_LOOKAHEAD = 0.5;
 
-    // todo revoir comment on utilise ca dans le code
     private static final int[] GAIN_OLIVERAIE = {10, 20, 60, 20, 10};
 
     private static final int SEUIL_COULOIR = 2;
 
-    // ── État interne (réinitialisé via debutDePartie) ─────────────────────────
     private boolean enTrainDeRecolter = false;
     private int toursEnOliveraie = 0;
     private int toursOptimaux = 0;
 
     private final PlateauAnalyser analyser;
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     public PlayerV1(String sonNom) {
         super(sonNom);
@@ -60,8 +52,6 @@ public class PlayerV1 extends Joueur {
         toursEnOliveraie = 0;
         toursOptimaux = 0;
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public Action faitUneAction(Plateau plateau) {
