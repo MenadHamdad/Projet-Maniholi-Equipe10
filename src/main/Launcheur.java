@@ -13,6 +13,7 @@ import jeu.Joueur;
 import jeu.MaitreDuJeu;
 import jeu.Plateau;
 import jeu.aetoile.Noeud;
+import main.MonJoueurAggressif;
 
 import static config.ConfigurationLog.UNITES_DE_RESSOURCAGE;
 import static util.Outils.pointToString;
@@ -113,7 +114,7 @@ public class Launcheur {
         //final Plateau plateau = Plateau.generePlateauAleatoire(100, 10, 8, 8, 20); // un plateau alÃ©atoire 20x20 pour une partie de 100 tours, 32 moulins, 32 oliveraies et 80 rochers
         //final Plateau plateau = Plateau.generePlateauAleatoire(1200, 10, 8, 8, 20); // un plateau alÃ©atoire 20x20 pour une partie de 1200 tours, 32 moulins, 32 oliveraies et 80 rochers
         //final Plateau plateau = new Plateau(300, Plateau.TEXTE_PLATEAU_ANORMAL_8x8_1); // un plateau prÃ©dÃ©fini 8x8 de test
-        //final Plateau plateau = new Plateau(1000, ); // le plateau 20x20 de l'Ã©noncÃ© pour une partie de 1000 tours
+        //final Plateau plateau = new Plateau(1000, Plateau.TEXTE_PLATEAU_ENONCE); // le plateau 20x20 de l'Ã©noncÃ© pour une partie de 1000 tours
 
         /* ***********************************
          * --- CrÃ©ation du maitre de jeu --- *
@@ -132,10 +133,10 @@ public class Launcheur {
          * non ajoutÃ©s explicitement sont ajoutÃ©s comme des instances   *
          * de Joueur, c'est-Ã -dire des joueurs Ã  dÃ©placement alÃ©atoire. *
          * **************************************************************/
-        jeu.metJoueurEnPosition(2, new PlayerV1("PlayerV1")); // un joueur spÃ©cifique
-        jeu.metJoueurEnPosition(3, new PlayerV1("PlayerV1")); // un joueur spÃ©cifique
-        jeu.metJoueurEnPosition(0, new NewPlayerV1("NewPlayerV1")); // un joueur spÃ©cifique
-        jeu.metJoueurEnPosition(1, new NewPlayerV1("NewPlayerV1")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(0, new PlayerV1("Luacs V1")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(1, new JoueurEquipe10("BOSS")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(2, new NewPlayerV1("NEW")); // un joueur spÃ©cifique
+        jeu.metJoueurEnPosition(3, new MonJoueurAggressif("Kemil")); // un joueur spÃ©cifique
         //jeu.metJoueurEnPosition(1, new JoueurHumain("Panisse",fenetre)); // un joueur humain
         //jeu.metJoueurEnPosition(2, new Joueur("Escartefigue")); // un joueur Ã  dÃ©placement alÃ©atoire
         //jeu.metJoueurEnPosition(3, new Joueur("M. Brun")); // un joueur Ã  dÃ©placement alÃ©atoire
